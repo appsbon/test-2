@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watch - StreamApp</title>
+    
+    <!-- FontAwesome Icons for Custom Controls -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        body { background-color: #141414; color: #fff; padding-bottom: 50px; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 5%; background-color: #000; }
+        header a { color: #e50914; text-decoration: none; font-size: 24px; font-weight: bold; }
+        .main-watch { max-width: 1280px; margin: 30px auto; padding: 0 20px; }
+
+        /* YouTube Style 16:9 Widescreen Video Player */
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 1280px;
+            aspect-ratio: 16 / 9; /* Standard YouTube Landscape Ratio */
+            overflow: hidden;
+            border-radius: 12px;
+            background-color: #000;
+            margin: 0 auto;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Fits 16:9 landscape perfectly */
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .custom-play-btn {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.6);
+            border: none;
+            color: #fff;
+            font-size: 36px;
+            width: 70px;
+            height: 70px;
+            cursor: pointer;
+            z-index: 15;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s ease, background 0.2s ease;
+        }
+
+        .custom-play-btn:hover {
+            transform: translate(-50%, -50%) scale(1.1);
+            background: rgba(229, 9, 20, 0.9);
+        }
+
+        .custom-play-btn.hidden {
+            display: none;
+        }
+
+        /* Controls styling */
+        .controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.85));
+            color: #fff;
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            box-sizing: border-box;
+            z-index: 10;
+        }
+
+        .play-btn, .volume-control, .fullscreen-btn {
+            font-size: 22px;
+            cursor: pointer;
+            z-index: 15;
+        }
+
+        .fullscreen-btn {
+            padding-left: 10px;
+            font-size: 22px;
+            cursor: pointer;
+            z-index: 15;
+        }
+
+        .progress-bar-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 15px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 5px;
+            background: rgba(255, 255, 255, 0.3);
+            position: relative;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+
+        .progress {
+            height: 100%;
+            background: #e50914;
+            width: 0;
+            border-radius: 3px;
+            transition: width 0.1s linear;
+        }
+
+        .buffered {
+            height: 100%;
+            background: rgba(255, 255, 255, 0.25);
+            width: 0;
+            position: absolute;
+            top: 0;
+            left: 0;
+            border-radius: 3px;
+        }
+
+        .progress-thumb {
+            width: 14px;
+            height: 14px;
+            background: #e50914;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+        }
+
+        .volume-slider-container {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .volume-slider {
+            width: 80px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            position: relative;
+            margin-left: 10px;
+            border-radius: 2px;
+        }
+
+        .volume-progress {
+            height: 100%;
+            background: #fff;
+            width: 0%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            border-radius: 2px;
+        }
+
+        .volume-thumb {
+            width: 12px;
+            height: 12px;
+            background: #fff;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            z-index: 2;
+        }
+
+        #loadingOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 15;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+        }
+
+        .spinner {
+            border: 6px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            border-top: 6px solid #e50914;
+            width: 45px;
+            height: 45px;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 768px) {
+            .volume-slider {
+                display: none;
+            }
+            .media-title {
+                font-size: 22px;
+            }
+            .download-btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
+        /* Series / Episode Section */
+        .episodes-section {
+            margin-top: 25px;
+            background: #1a1a1a;
+            padding: 20px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .episodes-section h3 {
+            margin-bottom: 15px;
+            font-size: 20px;
+            color: #fff;
+        }
+
+        .episodes-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .episode-btn {
+            background: #2a2a2a;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 10px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+            font-size: 14px;
+        }
+
+        .episode-btn:hover {
+            background: #3a3a3a;
+        }
+
+        .episode-btn.active {
+            background: #e50914;
+            border-color: #e50914;
+            font-weight: bold;
+        }
+
+        .details-container { 
+            margin-top: 25px; 
+            background: #1f1f1f; 
+            padding: 25px; 
+            border-radius: 8px; 
+        }
+
+        .details-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+
+        .media-title { font-size: 28px; }
+        
+        /* Download Button Styling */
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background-color: #e50914;
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s ease;
+        }
+
+        .download-btn:hover {
+            background-color: #b80710;
+        }
+
+        .meta-info { color: #aaa; font-size: 14px; margin-bottom: 15px; }
+        .synopsis { line-height: 1.6; color: #ddd; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <a href="index.html">StreamApp</a>
+    </header>
+
+    <main class="main-watch">
+        <!-- Optional Top Ad Slot -->
+        <div id="ad-slot-top" style="margin-bottom:30px;"></div>
+
+        <!-- 16:9 YouTube Style Video Container -->
+        <div class="video-container">
+            <video controlslist="nodownload" id="myVideo" oncontextmenu="return false;" preload="auto">
+               <source id="videoSource" src="" type="video/mp4"></source>
+               Your browser does not support the video tag.
+            </video>
+            <button class="custom-play-btn" id="customPlayPauseButton"><i class="fas fa-play"></i></button>
+            <div class="controls">
+                <div class="play-btn" id="playPauseButton">
+                    <i class="fas fa-play"></i>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar">
+                        <div class="progress" id="progress"></div>
+                        <div class="progress-thumb" id="progressThumb"></div>
+                        <div class="buffered" id="buffered"></div>
+                    </div>
+                </div>
+                <div class="volume-slider-container">
+                    <div class="volume-control" id="volumeControl">
+                        <i class="fas fa-volume-up"></i>
+                    </div>
+                    <div class="volume-slider">
+                        <div class="volume-progress" id="volumeProgress"></div>
+                        <div class="volume-thumb" id="volumeThumb"></div>
+                    </div>
+                </div>
+                <div class="fullscreen-btn" id="fullscreenButton">
+                    <i class="fas fa-expand"></i>
+                </div>
+            </div>
+            <div id="loadingOverlay">
+                <div class="spinner"></div>
+            </div>
+        </div>
+
+        <!-- Series Episodes Navigation Container -->
+        <div class="episodes-section" id="episodesSection">
+            <h3>Episodes</h3>
+            <div class="episodes-grid" id="episodesGrid"></div>
+        </div>
+
+        <div class="details-container">
+            <div class="details-header">
+                <h1 class="media-title" id="title">Loading...</h1>
+                <!-- Download Button -->
+                <button class="download-btn" id="downloadBtn">
+                    <i class="fas fa-download"></i> Download Video
+                </button>
+            </div>
+            <div class="meta-info" id="meta"></div>
+            <p class="synopsis" id="synopsis"></p>
+        </div>
+
+        <!-- Bottom Ad Slot -->
+        <div id="ad-slot-bottom" style="margin-top:40px;"></div>
+    </main>
+
+    <!-- External Data & Ad Files -->
+    <script src="movies.js"></script>
+    <script src="series.js"></script>
+    <script src="ads.js"></script>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const mediaId = urlParams.get("id");
+
+        const video = document.getElementById('myVideo');
+        const videoSource = document.getElementById('videoSource');
+        const episodesSection = document.getElementById('episodesSection');
+        const episodesGrid = document.getElementById('episodesGrid');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        let currentVideoUrl = "";
+
+        function playVideo(videoUrl) {
+            if (!videoUrl) return;
+            currentVideoUrl = videoUrl;
+            videoSource.src = videoUrl;
+            video.load();
+            video.play().catch(e => console.log('Autoplay prevented or paused:', e));
+        }
+
+        // Download trigger logic
+        downloadBtn.addEventListener('click', () => {
+            if (!currentVideoUrl) {
+                alert('No video available to download.');
+                return;
+            }
+
+            const titleText = document.getElementById('title').textContent.trim() || 'video';
+            const fileName = `${titleText.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.mp4`;
+
+            const link = document.createElement('a');
+            link.href = currentVideoUrl;
+            link.download = fileName;
+            link.target = '_blank';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        // Aggregate movies and series data safely
+        let allContent = [];
+        
+        if (typeof movies !== "undefined" && Array.isArray(movies)) {
+            allContent = allContent.concat(movies);
+        }
+        
+        const seriesData = window.series || window.tvSeries || window.showList || (typeof series !== "undefined" ? series : undefined);
+        if (typeof seriesData !== "undefined" && Array.isArray(seriesData)) {
+            allContent = allContent.concat(seriesData);
+        }
+
+        // Case-insensitive and URL-decoded lookup
+        const cleanMediaId = mediaId ? decodeURIComponent(mediaId).trim().toLowerCase() : "";
+        
+        const item = allContent.find(m => {
+            const itemId = m.id ? String(m.id).trim().toLowerCase() : "";
+            const itemTitle = m.title ? String(m.title).trim().toLowerCase() : "";
+            return itemId === cleanMediaId || itemTitle === cleanMediaId;
+        });
+
+        if (item) {
+            document.getElementById("title").textContent = item.title || "Untitled";
+            document.getElementById("meta").textContent = [item.year, item.genre].filter(Boolean).join(" | ");
+            document.getElementById("synopsis").textContent = item.synopsis || "No synopsis available.";
+            
+            // Set 16:9 Landscape Poster/Thumbnail
+            if (item.poster || item.backdrop || item.thumbnail) {
+                video.poster = item.backdrop || item.poster || item.thumbnail;
+            }
+
+            // Extract all episodes flat array regardless of structure format
+            let allEpisodes = [];
+
+            if (item.episodes && Array.isArray(item.episodes) && item.episodes.length > 0) {
+                allEpisodes = item.episodes;
+            } else if (item.seasons && Array.isArray(item.seasons)) {
+                item.seasons.forEach(seasonObj => {
+                    if (seasonObj.episodes && Array.isArray(seasonObj.episodes)) {
+                        allEpisodes = allEpisodes.concat(seasonObj.episodes);
+                    }
+                });
+            }
+
+            // Render Episodes Buttons if item is a series
+            if (allEpisodes.length > 0) {
+                episodesSection.style.display = 'block';
+                episodesGrid.innerHTML = '';
+
+                allEpisodes.forEach((ep, index) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'episode-btn';
+                    btn.textContent = ep.title || `Episode ${ep.episode || index + 1}`;
+                    
+                    btn.addEventListener('click', () => {
+                        document.querySelectorAll('.episode-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        playVideo(ep.video || ep.src || ep.url);
+                    });
+
+                    episodesGrid.appendChild(btn);
+                });
+
+                // Auto-play the first episode
+                const firstBtn = episodesGrid.querySelector('.episode-btn');
+                if (firstBtn) firstBtn.classList.add('active');
+                playVideo(allEpisodes[0].video || allEpisodes[0].src || allEpisodes[0].url);
+
+            } else {
+                // Single Video / Movie Fallback
+                const movieUrl = item.video || item.src || item.url;
+                if (movieUrl) {
+                    playVideo(movieUrl);
+                }
+            }
+
+        } else {
+            document.getElementById("title").textContent = "Item Not Found";
+            downloadBtn.style.display = "none";
+        }
+
+        // Custom Player Controls Logic
+        const customPlayPauseButton = document.getElementById('customPlayPauseButton');
+        const playPauseButton = document.getElementById('playPauseButton');
+        const progress = document.getElementById('progress');
+        const buffered = document.getElementById('buffered');
+        const progressThumb = document.getElementById('progressThumb');
+        const volumeControl = document.getElementById('volumeControl');
+        const volumeSlider = document.querySelector('.volume-slider');
+        const volumeProgress = document.getElementById('volumeProgress');
+        const volumeThumb = document.getElementById('volumeThumb');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const fullscreenButton = document.getElementById('fullscreenButton');
+        const progressBar = document.querySelector('.progress-bar');
+        
+        let isDragging = false;
+        let isVolumeDragging = false;
+
+        function updatePlayPauseButton() {
+            const icon = video.paused || video.ended ? 'fa-play' : 'fa-pause';
+            playPauseButton.innerHTML = `<i class="fas ${icon}"></i>`;
+            customPlayPauseButton.innerHTML = `<i class="fas ${icon}"></i>`;
+        }
+
+        function togglePlay() {
+            if (video.paused || video.ended) {
+                video.play().catch(error => console.error('Play error:', error));
+            } else {
+                video.pause();
+            }
+            updatePlayPauseButton();
+        }
+
+        playPauseButton.addEventListener('click', togglePlay);
+        customPlayPauseButton.addEventListener('click', togglePlay);
+
+        video.addEventListener('timeupdate', () => {
+            if (video.duration) {
+                const percentage = (video.currentTime / video.duration) * 100;
+                progress.style.width = percentage + '%';
+                progressThumb.style.left = percentage + '%';
+            }
+        });
+
+        video.addEventListener('progress', () => {
+            if (video.buffered.length > 0) {
+                const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+                const bufferedPercentage = (bufferedEnd / video.duration) * 100;
+                buffered.style.width = bufferedPercentage + '%';
+            }
+        });
+
+        progressBar.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            updateProgress(e);
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            isVolumeDragging = false;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) updateProgress(e);
+            if (isVolumeDragging) updateVolume(e);
+        });
+
+        function updateProgress(e) {
+            const rect = progressBar.getBoundingClientRect();
+            const offsetX = e.clientX - rect.left;
+            const percentage = Math.max(0, Math.min(100, (offsetX / rect.width) * 100));
+            progress.style.width = percentage + '%';
+            progressThumb.style.left = percentage + '%';
+            if (video.duration) {
+                video.currentTime = (percentage / 100) * video.duration;
+            }
+        }
+
+        function updateVolume(e) {
+            const rect = volumeSlider.getBoundingClientRect();
+            const offsetX = e.clientX - rect.left;
+            const percentage = Math.max(0, Math.min(100, (offsetX / rect.width) * 100));
+            volumeProgress.style.width = percentage + '%';
+            volumeThumb.style.left = percentage + '%';
+            video.volume = percentage / 100;
+        }
+
+        volumeControl.addEventListener('click', () => {
+            video.muted = !video.muted;
+            volumeControl.innerHTML = video.muted ? '<i class="fas fa-volume-mute"></i>' : '<i class="fas fa-volume-up"></i>';
+        });
+
+        volumeSlider.addEventListener('mousedown', (e) => {
+            isVolumeDragging = true;
+            updateVolume(e);
+        });
+
+        function setVolumeSlider() {
+            const volumePercentage = video.volume * 100;
+            volumeProgress.style.width = volumePercentage + '%';
+            volumeThumb.style.left = volumePercentage + '%';
+        }
+
+        fullscreenButton.addEventListener('click', () => {
+            if (video.requestFullscreen) {
+                video.requestFullscreen();
+            } else if (video.webkitRequestFullscreen) {
+                video.webkitRequestFullscreen();
+            } else if (video.msRequestFullscreen) {
+                video.msRequestFullscreen();
+            }
+        });
+
+        video.addEventListener('waiting', () => {
+            loadingOverlay.style.display = 'flex';
+        });
+
+        video.addEventListener('playing', () => {
+            loadingOverlay.style.display = 'none';
+            updatePlayPauseButton();
+        });
+
+        video.addEventListener('pause', () => {
+            updatePlayPauseButton();
+        });
+
+        video.addEventListener('error', () => {
+            loadingOverlay.style.display = 'none';
+        });
+
+        setVolumeSlider();
+    });
+    </script>
+</body>
+</html>
